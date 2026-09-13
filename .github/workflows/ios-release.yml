@@ -52,7 +52,8 @@ jobs:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: python3 scripts/secretgram_ci_configuration.py
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: bazel-cache
         with:
           path: ~/.cache/secretgram-bazel
           key: secretgram-macos26-xcode262-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock', 'versions.json') }}-${{ github.sha }}
@@ -94,3 +95,8 @@ jobs:
           name: SecretGram-build-log
           path: build/secretgram-build.log
           if-no-files-found: ignore
+      - uses: actions/cache/save@v4
+        if: always() && steps.bazel-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/secretgram-bazel
+          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}

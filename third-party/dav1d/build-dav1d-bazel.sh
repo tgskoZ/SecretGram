@@ -10,7 +10,13 @@ MESON_OPTIONS="--buildtype=release --default-library=static -Denable_tools=false
 CROSSFILE=""
 
 if [ "$ARCH" = "arm64" ]; then
-    CROSSFILE="../package/crossfiles/arm64-iPhoneOS.meson"
+    # The selected Xcode may have a versioned name on CI. Do not rely on
+    # /Applications/Xcode.app, which can point to a different (or removed) SDK.
+    TARGET_CROSSFILE="$BUILD_DIR/dav1d/package/crossfiles/arm64-iPhoneOS-custom.meson"
+    custom_xcode_path="${DEVELOPER_DIR:-$(xcode-select -p)}/"
+    sed "s|/Applications/Xcode.app/Contents/Developer/|$custom_xcode_path|g" \
+        "$BUILD_DIR/dav1d/package/crossfiles/arm64-iPhoneOS.meson" > "$TARGET_CROSSFILE"
+    CROSSFILE="../package/crossfiles/arm64-iPhoneOS-custom.meson"
 elif [ "$ARCH" = "sim_arm64" ]; then
     rm -f "arm64-iPhoneSimulator-custom.meson"
     TARGET_CROSSFILE="$BUILD_DIR/dav1d/package/crossfiles/arm64-iPhoneSimulator-custom.meson"
@@ -76,4 +82,3 @@ ninja
 
 popd
 popd
-
