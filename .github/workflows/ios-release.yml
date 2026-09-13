@@ -1,0 +1,96 @@
+name: Build SecretGram IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag for the successfully built IPA
+        required: true
+        default: v1.0.0
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: secretgram-ipa-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 350
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Validate release and toolchain
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]
+          test -d "$DEVELOPER_DIR"
+          sudo xcode-select --switch "$DEVELOPER_DIR"
+          xcodebuild -version
+          df -h .
+      - name: Free unused Xcode installations on this ephemeral runner
+        run: |
+          sudo python3 - <<'PY'
+          import pathlib, shutil
+          selected = pathlib.Path('/Applications/Xcode_26.2.app').resolve()
+          for app in pathlib.Path('/Applications').glob('Xcode_*.app'):
+              if not app.is_symlink() and app.resolve() != selected:
+                  print('Removing unused runner toolchain:', app)
+                  shutil.rmtree(app)
+          PY
+          df -h .
+      - name: Test plugin inspection and storage
+        run: sh scripts/test-secretgram-plugins.sh
+      - name: Configure SecretGram
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python3 scripts/secretgram_ci_configuration.py
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/secretgram-bazel
+          key: secretgram-macos26-xcode262-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock', 'versions.json') }}-${{ github.sha }}
+          restore-keys: |
+            secretgram-macos26-xcode262-${{ hashFiles('MODULE.bazel', 'MODULE.bazel.lock', 'versions.json') }}-
+      - name: Build unsigned arm64 IPA
+        run: |
+          set -o pipefail
+          mkdir -p build/release
+          python3 -u build-system/Make/Make.py \
+            --cacheDir "$HOME/.cache/secretgram-bazel" \
+            --bazelArguments='--jobs=2 --local_ram_resources=4500' \
+            build --configurationPath build-system/secretgram-configuration.json \
+            --xcodeManagedCodesigning --unsigned --configuration release_arm64 \
+            --buildNumber "$GITHUB_RUN_NUMBER" \
+            --outputBuildArtifactsPath build/release 2>&1 | tee build/secretgram-build.log
+      - name: Verify device IPA
+        run: |
+          mv build/release/Telegram.ipa build/release/SecretGram.ipa
+          python3 scripts/verify_secretgram_ipa.py build/release/SecretGram.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SecretGram-unsigned-IPA
+          path: |
+            build/release/SecretGram.ipa
+            build/release/SecretGram.ipa.sha256
+          if-no-files-found: error
+      - name: Publish the verified artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" \
+            --title "SecretGram $RELEASE_TAG" --prerelease \
+            --notes-file docs/SECRETGRAM_RELEASE_NOTES.md \
+            build/release/SecretGram.ipa build/release/SecretGram.ipa.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SecretGram-build-log
+          path: build/secretgram-build.log
+          if-no-files-found: ignore

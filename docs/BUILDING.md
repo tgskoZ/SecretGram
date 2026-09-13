@@ -1,0 +1,40 @@
+# Building SecretGram from Source
+
+This guide describes the public build contract for SecretGram Stable source snapshots.
+
+## Base
+
+```text
+TelegramMessenger/Telegram-iOS
+release-12.9.2
+6ad963e5b62d354da79040f388ae2b9132fb17b8
+```
+
+## Stable source snapshot
+
+The public Stable snapshot contains the release source tree and the corresponding build material included with that source, including the relevant Bazel/build definitions and source dependencies.
+
+For SecretGram 1.0.2, use the public source tag `v1.0.2` and verify the release metadata in `SECRETGRAM_RELEASE.json` before building.
+
+## What you provide yourself
+
+You are expected to provide your own:
+
+- Telegram `api_id` / `api_hash`;
+- Apple signing identity;
+- provisioning setup;
+- bundle identifiers and Apple configuration appropriate to your build.
+
+The public repository does not provide personal certificates, provisioning profiles, private keys, user sessions or private secrets.
+
+## High-level flow
+
+1. Check out the exact Stable source tag.
+2. Verify `SECRETGRAM_RELEASE.json` and `public-source-manifest.json`.
+3. Configure your own Telegram API credentials and application identity.
+4. Configure your own Apple signing environment.
+5. Build using the build system included in the tagged release source tree.
+
+## Build environment
+
+SecretGram keeps the Telegram for iOS build system that is present in the corresponding release source. Local signing, provisioning and developer-specific configuration are intentionally not published as part of the Stable source record.
