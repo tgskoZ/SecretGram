@@ -18,7 +18,7 @@ with zipfile.ZipFile(args.ipa) as archive:
         raise SystemExit('Expected exactly one main .app under Payload/')
     plist = plistlib.loads(archive.read(roots[0]))
     if plist.get('CFBundleDisplayName') != 'SecretGram' or plist.get('CFBundleIdentifier') != 'app.secretgram.ios':
-        raise SystemExit('Unexpected application identity')
+        raise SystemExit(f"Unexpected application identity: name={plist.get('CFBundleDisplayName')!r}, bundle={plist.get('CFBundleIdentifier')!r}")
     if 'iPhoneOS' not in plist.get('CFBundleSupportedPlatforms', []):
         raise SystemExit('Not a device IPA')
     executable = roots[0].removesuffix('Info.plist') + plist['CFBundleExecutable']

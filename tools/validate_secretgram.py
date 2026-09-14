@@ -23,6 +23,11 @@ for base in ['Telegram', 'submodules']:
         count += 1
 print('Branding scan:', count, 'source/resource files')
 
+build_source = (root / 'Telegram/BUILD').read_text(encoding='utf-8')
+main_plist = build_source.split('name = "TelegramInfoPlist",', 1)[1].split('</plist>', 1)[0]
+for key in ['CFBundleDisplayName', 'CFBundleName']:
+    assert re.search(r'<key>' + key + r'</key>\s*<string>SecretGram</string>', main_plist), key
+
 for name in ['Info.plist', 'InfoBazel.plist']:
     data = plistlib.loads((root / 'Telegram/Telegram-iOS' / name).read_bytes())
     assert data['CFBundleDisplayName'] == 'SecretGram'
