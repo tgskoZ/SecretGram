@@ -82,9 +82,19 @@ final class SecretGramPluginStore {
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         guard values.isRegularFile == true else { throw SecretGramPluginError.invalidContent }
         guard (values.fileSize ?? 0) <= Self.maximumBytes else { throw SecretGramPluginError.tooLarge }
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { handle.closeFile() }
-        let data = try handle.read(upToCount: Self.maximumBytes + 1) ?? Data()
+        // InputStream supports the app's iOS 13.0 deployment target, reports
+        // read errors, and bounds allocation even if the file grows after stat.
+        guard let stream = InputStream(url: url) else { throw CocoaError(.fileReadUnknown) }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while data.count <= Self.maximumBytes {
+            let count = stream.read(&buffer, maxLength: min(buffer.count, Self.maximumBytes + 1 - data.count))
+            if count < 0 { throw stream.streamError ?? CocoaError(.fileReadUnknown) }
+            if count == 0 { break }
+            data.append(contentsOf: buffer.prefix(count))
+        }
         let record = try Self.inspect(data: data, filename: url.lastPathComponent)
         let existing = try records()
         guard existing.count < 50 else { throw SecretGramPluginError.storageFull }

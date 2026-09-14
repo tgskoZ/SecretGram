@@ -45,6 +45,12 @@ jobs:
                   shutil.rmtree(app)
           PY
           df -h .
+      - name: Typecheck plugin importer for iOS 13.0
+        run: |
+          xcrun --sdk iphoneos swiftc -typecheck \
+            -target arm64-apple-ios13.0 \
+            -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            submodules/SettingsUI/Sources/SecretGram/SecretGramPluginStore.swift
       - name: Test plugin inspection and storage
         run: sh scripts/test-secretgram-plugins.sh
       - name: Configure SecretGram
